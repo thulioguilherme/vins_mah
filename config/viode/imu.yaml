@@ -1,0 +1,24 @@
+%YAML:1.0
+
+imu0:
+  # Original parameters from VIODE Github
+  accelerometer_noise: 0.2
+  accelerometer_random_walk: 0.02
+  accelerometer_bias_threshold: 0.1
+
+  gyroscope_noise: 0.05
+  gyroscope_random_walk: 4.0e-5
+  gyroscope_bias_threshold: 0.1
+
+  # AirSim parameters
+  # The VIODE dataset uses the IMU implementation from AirSim. The parameters
+  # below are from this discussion: https://github.com/microsoft/AirSim/discussions/3523
+  # accelerometer_noise: 0.002353596
+  # accelerometer_random_walk: 1.2481827e-5
+  # accelerometer_bias_threshold: 0.1
+
+  # gyroscope_noise: 8.7266462e-5
+  # gyroscope_random_walk: 9.9735023e-7
+  # gyroscope_bias_threshold: 0.1
+
+  gravity_magnitude: 9.81007

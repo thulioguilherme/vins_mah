@@ -1,0 +1,26 @@
+root: ./
+name: estimator
+startup_window: vins_mah
+pre_window: export UAV_NAME=uav33; export SCENE_NAME=parking_lot; export DYNAMIC_LEVEL="0_none"; export BAG_PATH="$HOME/refactored_bags/$SCENE_NAME/$DYNAMIC_LEVEL"
+windows:
+  - bag:
+      layout: tiled
+      panes:
+        - sleep 2; ros2 bag play $BAG_PATH
+  - vins_mah:
+      layout: tiled
+      panes:
+        - ros2 launch vins_mah estimator_node.launch.py
+  - helpers:
+      layout: tiled
+      panes:
+        - ros2 launch trajectory_tools groundtruth_alignment.launch.py topic_odom:=/vm_estimator/odom topic_gt:=/groundtruth/odom
+        - ros2 launch trajectory_tools publish_odometry_as_path.launch.py topic_odom:=/groundtruth/odom
+  - rviz:
+      layout: tiled
+      panes:
+        - sleep 2; ros2 launch vins_mah rviz.launch.py
+  - record_trajectory:
+      layout: tiled
+      panes:
+        - ros2 launch ov_eval record_viode_trajectories.launch.py scene_name:=$SCENE_NAME dynamic_level:=$DYNAMIC_LEVEL
