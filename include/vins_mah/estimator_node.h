@@ -41,7 +41,7 @@ private:
   rclcpp::TimerBase::SharedPtr timer_preinitialization_;
   void callbackTimerPreinitialization();
 
-  std::string _uav_name_;
+  std::string _node_namespace_;
 
   std::atomic<bool> is_initialized_ = false;
 

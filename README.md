@@ -1,40 +1,16 @@
 # VINS-Mah
-## :boom:A monocular visual-inertial odometry for dynamic environments
-VINS-Mah achieves better performance in dynamic environments than the baseline methods while not degrading in static scenarios. It is built on the well-known method [VINS-Fusion](https://github.com/HKUST-Aerial-Robotics/VINS-Fusion.git). However, our proposed method only supports one configuration, which is "one camera and one IMU". More configurations might be developed in the future.
 
-## :runner:Running environments
-We recommend referring the VINS-Fusion project, as there are no additional packages required to  run this algorithm. The only thing you might want to pay attention to is that we ran and tested this method on Ubuntu 20.04 and ROS Noetic.The required configuration environment is OpenCV 4.2.0 and Ceres Solver 1.14.0.
+## Changes from the original repository
 
-## :octocat:Prerequisites
-### Ubuntu and ROS
-Ubuntu 20.04.[Ubuntu Installation](https://www.releases.ubuntu.com/focal/)
+* Updated the original implementation to ROS 2 (tested on Humble/Ubuntu 22.04).
 
-ROS Noetic: [ROS Installation](http://wiki.ros.org/ROS/Installation)
+* Created the `refactor_viode_rosbag.py` script to update the frame_ids and topic names of the VIODE rosbags, making them easy to visualize on Rviz2
 
-### Ceres Sovler
-The 1.14.0 version is used in this project, we recommend installing it using following command:
+```bash
+python3 refactor_viode_rosbag.py --input bags/input --output bags/output --namespace /uav33 --rename-topics /odometry=/groundtruth/odom --set-frame-id /imu0=uav33/viode_imu0 /cam0/image_raw=uav33/viode_cam0 /cam0/segmentation=uav33/viode_cam0 /cam1/image_raw=uav33/viode_cam1 /cam1/segmentation=uav33/viode_cam1 /odometry=uav33/viode_world --set-child-frame-id /odometry=uav33/viode_imu0
 ```
-sudo apt-get install libceres-dev
-```
-### OpenCV
-OpenCV 4.2.0. If you are using the Noetic version of ROS, it comes with OpenCV 4.2.0 pre-installed.
 
-## :construction_worker:Build VINS-Mah
-Clone the repository and catkin build:
-```
-cd ~/catkin_ws/src
-git clone https://github.com/hyq123-cmd/VINS-Mah.git
-cd ../
-catkin build vins_mah
-source ~/catkin_ws/devel/setup.bash
-```
-## :mega:VIODE example
-Please download the [VIODE dataset](https://zenodo.org/records/4493401) to your dataset folder Dataset_Folder. The following will run 3_high.bag under city_day in the form of monocular camera + IMU.
-```
-roslaunch vins_mah vins_viode.launch
-rosbag play Dataset_Folder/city_day/3_high.bag
-```
-## Troubleshooting
-This repository may fail to build in certain environments. We are actively working on fixing these issues. If you encounter any problems, please report them promptly.
-## :clipboard:License
-This project is licensed under the GNU General Public License v3.0 (GPLv3), in accordance with the license of the original project it is based on.
+## A visual-inertial odometry for dynamic environments
+The VINS-Mah achieves better performance in dynamic environments than the baseline methods while not degrading in static scenarios. It is built on the well-known method [VINS-Fusion](https://github.com/HKUST-Aerial-Robotics/VINS-Fusion.git).
+
+Original repository README: https://github.com/hyq123-cmd/VINS-Mah

@@ -1,0 +1,50 @@
+/**/**:
+  ros__parameters:
+    # Change the subscribers (IMU and Camera) QoS from BEST EFFORT to RELIABLE to
+    # avoid dropping messages when having large communication payloads.
+    # For some reason, the 'ros2 bag' drops some images when playing the bag.
+    use_reliable_qos: true
+
+    increase_verbosity: false
+
+    # Uncertainty estimator parameters
+    # Best configuration from the paper: window_size = 10, confidence threshold = 95%
+    window_size: 10
+
+    # Chi-square threshold used for Mahalanobis-distance-based feature outlier rejection
+    outlier_chi_square_threshold: 5.991  # 5.991 -> 95% confidence threshold
+
+    init_depth: 5.01
+
+    use_imu: true
+    use_stereo: false
+
+    # Delta between two images (left and right on stereo setup) to be considered synchronized
+    image_sync_timestamp_tolerance: 0.003  # [s]
+
+    # Multiple thread support
+    use_multithreading: false
+
+    # Feature tracker parameters
+    num_pts: 150  # number of points to extract and try to track
+    min_pixel_dist: 15  # min distance between two features in pixels
+    ransac_reproj_threshold: 1.0  # ransac threshold (pixel)
+    publish_track_images: true  # publish tracking image as topic
+    use_flow_back: true            # perform forward and backward optical flow to improve feature tracking accuracy
+    use_mask: false
+    mask_file: 'mask.png'  # Need to be on the config folder to be found
+
+    min_parallax: 10.0 # [pixel] keyframe selection threshold
+
+    # Optimization parameters
+    solver_max_time: 0.04  # [ms] max solver iteration time (to guarantee real time)
+    solver_max_num_iterations: 8  # max solver itrations (to guarantee real time)
+
+    # Calibration parameters
+    # Online calibration of the transformation between camera and IMU
+    calib_cam_extrinsics_mode: 'fixed'  # [fixed, optimize, calibrate]
+    calib_cam_time_offset: false   # Online calibration time offset between camera and IMU
+    cam_time_offset: 0.0  # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
+
+    config_imu: 'imu.yaml'
+    config_imucam: 'imucam.yaml'

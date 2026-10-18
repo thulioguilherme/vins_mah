@@ -103,8 +103,8 @@ class FeatureTracker
     // added by myself
     void saveImage(const int frameCnt, const set<int> keepIndex, const set<int> removeIndex);
     Eigen::Matrix2d computeHessian(const cv::Mat& image, const cv::Point2f& center, int winSize = 21);
-    /* void getCovariance(const cv::Mat& cur_img, const cv::Mat& prev_img, const cv::Point2f& center, const int id, const double err, const bool right); */
-    void getCovariance(const cv::Mat& cur_img, const cv::Mat& prev_img, const cv::Point2f& center, const int id, const int feature_index, const double err, const bool right);
+    /* void getCovariance(const cv::Mat& cur_img, const cv::Mat& prev_img, const cv::Point2f& center, const int id, const int feature_index, const double err, const bool right); */
+    void getCovariance(const cv::Mat& cur_img, const cv::Mat& prev_img, const cv::Point2f& center, const int id, const int feature_index, const bool right);
     void eraseMap(std::map<int,double>& flowVars, const std::vector<int>& ids);
     void getUndistortedCovs(const int& feature_id, const int feature_index, bool right);
     double computeVariance(const cv::Mat& cur_img, const cv::Mat& prev_img,

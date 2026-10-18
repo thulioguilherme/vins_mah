@@ -34,13 +34,9 @@ def add_namespace(namespace, topic):
     return f"{namespace}/{topic}"
 
 
-def remap_frame(frame_id, frame_map):
-    return frame_map.get(frame_id, frame_id)
-
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Copy a ROS 2 bag while renaming topics and remapping frame IDs."
+        description="Copy a ROS 2 bag while renaming topics and setting frame IDs based on topic names."
     )
 
     parser.add_argument(
@@ -62,34 +58,35 @@ def main():
     )
 
     parser.add_argument(
-        "--map",
-        nargs="*",
-        default=[],
-        metavar="TOPIC=FRAME_ID",
-        help="Set header.frame_id for specific topics."
-    )
-
-    parser.add_argument(
-        "--frame-map",
-        nargs="*",
-        default=[],
-        metavar="OLD=NEW",
-        help="Remap frame IDs."
-    )
-
-    parser.add_argument(
-        "--topic-map",
+        "--rename-topics",
         nargs="*",
         default=[],
         metavar="OLD=NEW",
         help="Rename topics before applying the namespace."
     )
 
+    parser.add_argument(
+        "--set-frame-id",
+        nargs="*",
+        default=[],
+        metavar="TOPIC=FRAME_ID",
+        help="Overwrite header.frame_id for specific topics."
+    )
+
+    parser.add_argument(
+        "--set-child-frame-id",
+        nargs="*",
+        default=[],
+        metavar="TOPIC=CHILD_FRAME_ID",
+        help="Overwrite child_frame_id for specific topics."
+    )
+
     args = parser.parse_args()
 
-    topic_to_frame = parse_mapping(args.map)
-    frame_map = parse_mapping(args.frame_map)
-    topic_map = parse_mapping(args.topic_map)
+    # Map the parsed CLI arguments to dictionaries
+    topic_map = parse_mapping(args.rename_topics)
+    topic_to_frame_id = parse_mapping(args.set_frame_id)
+    topic_to_child_frame_id = parse_mapping(args.set_child_frame_id)
 
     storage_options = rosbag2_py.StorageOptions(
         uri=args.input,
@@ -143,27 +140,15 @@ def main():
         msg_type = type_map[topic_name]
         msg = deserialize_message(data, msg_type)
 
-        #
-        # Update header.frame_id
-        #
+        # Update header.frame_id based on the original topic name
         if hasattr(msg, "header"):
+            if topic_name in topic_to_frame_id:
+                msg.header.frame_id = topic_to_frame_id[topic_name]
 
-            if topic_name in topic_to_frame:
-                msg.header.frame_id = topic_to_frame[topic_name]
-            else:
-                msg.header.frame_id = remap_frame(
-                    msg.header.frame_id,
-                    frame_map
-                )
-
-        #
-        # Update child_frame_id
-        #
+        # Update child_frame_id based on the original topic name
         if hasattr(msg, "child_frame_id"):
-            msg.child_frame_id = remap_frame(
-                msg.child_frame_id,
-                frame_map
-            )
+            if topic_name in topic_to_child_frame_id:
+                msg.child_frame_id = topic_to_child_frame_id[topic_name]
 
         data = serialize_message(msg)
 

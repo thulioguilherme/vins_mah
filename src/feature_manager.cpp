@@ -55,8 +55,6 @@ namespace vins_mah
 
 
   bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 11, 1>>>> &image, double td) {
-    VLOG(1) << "Input features: " << static_cast<int>(image.size());
-    VLOG(1) << "Num. of features: " << getFeatureCount();
     double parallax_sum = 0;
     int parallax_num = 0;
     last_track_num = 0;
@@ -112,8 +110,8 @@ namespace vins_mah
     }
     else
     {
-      VLOG(1) << "parallax_sum: " << parallax_sum << ", parallax_num: " << parallax_num;
-      VLOG(1) << "current parallax: " << parallax_sum / parallax_num * focal_length_;
+      VLOG(1) << "Parallax_sum: " << parallax_sum << ", parallax_num: " << parallax_num;
+      VLOG(1) << "Current parallax: " << parallax_sum / parallax_num * focal_length_;
       last_average_parallax = parallax_sum / parallax_num * focal_length_;
       return parallax_sum / parallax_num >= min_parallax_;
     }

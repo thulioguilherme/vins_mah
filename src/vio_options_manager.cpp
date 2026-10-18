@@ -74,6 +74,12 @@ void VioOptionsManager::getVioOptions() {
   node_->declare_parameter<int>("window_size", 20);
   node_->get_parameter("window_size", vio_options_.window_size);
 
+  node_->declare_parameter<double>("outlier_chi_square_threshold", 5.991);
+  node_->get_parameter("outlier_chi_square_threshold", vio_options_.outlier_chi_square_threshold);
+
+  node_->declare_parameter<double>("image_sync_timestamp_tolerance", 0.003);
+  node_->get_parameter("image_sync_timestamp_tolerance", vio_options_.image_sync_timestamp_tolerance);
+
   node_->declare_parameter<bool>("use_reliable_qos", true);
   node_->get_parameter("use_reliable_qos", vio_options_.use_reliable_qos);
 
@@ -92,7 +98,7 @@ void VioOptionsManager::getVioOptions() {
   node_->declare_parameter<bool>("use_mask", false);
   node_->get_parameter("use_mask", vio_options_.use_mask);
 
-  // NOTE: we expect the mask file to be on the CONFIG_FOLDER
+  // NOTE: we expect the mask file to be on the config folder
   node_->declare_parameter<std::string>("mask_file", "mask.png");
   node_->get_parameter("mask_file", vio_options_.mask_file);
 
@@ -188,6 +194,14 @@ vins_mah::CameraOptions VioOptionsManager::getCameraOptions(const YAML::Node &ro
   auto resolution = cfg_imucam["resolution"].as<std::vector<int>>();
   cam_options.width = resolution[0];
   cam_options.height = resolution[1];
+
+  RCLCPP_INFO(
+    node_->get_logger(),
+    "Camera resolution %s: %d (height) x %d (width)",
+    camera_name.c_str(),
+    cam_options.height,
+    cam_options.width
+  );
 
   // get camera model
   auto pinhole_camera = std::make_shared<vins_mah::camera_model::PinholeCamera>();

@@ -132,7 +132,7 @@ namespace vins_mah
       if(hasPrediction)
       {
         cur_pts = predict_pts;
-        cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, left_err, cv::Size(21, 21), 1, 
+        cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, left_err, cv::Size(21, 21), 1,
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
 
         int succ_num = 0;
@@ -184,7 +184,7 @@ namespace vins_mah
 
     // added by myself
     for(size_t i = 0; i < cur_pts.size(); i++) {
-      getCovariance(cur_img, prev_img, cur_pts[i], ids[i], i, left_err[i], false);
+      getCovariance(cur_img, prev_img, cur_pts[i], ids[i], i, false);
     }
 
     if (1)
@@ -276,22 +276,23 @@ namespace vins_mah
     hasPrediction = false;
 
     prevLeftPtsMap.clear();
-    for(size_t i = 0; i < cur_pts.size(); i++)
+    for (size_t i = 0; i < cur_pts.size(); i++) {
       prevLeftPtsMap[ids[i]] = cur_pts[i];
+    }
 
     // added by myself
-    for(size_t i = 0; i < cur_right_pts.size(); i++) {
-      getCovariance(rightImg, prev_img, cur_right_pts[i], ids_right[i], i, right_err[i], true);
+    for (size_t i = 0; i < cur_right_pts.size(); i++) {
+      getCovariance(rightImg, prev_img, cur_right_pts[i], ids_right[i], i, true);
     }
+
     for(size_t i = 0; i < ids.size(); i++) {
       getUndistortedCovs(ids[i], i, false);
       if (!_img1.empty() && use_stereo_)
         getUndistortedCovs(ids_right[i], i, true);
     }
 
-    map<int, vector<pair<int, Eigen::Matrix<double, 11, 1>>>> featureFrame;
-    for (size_t i = 0; i < ids.size(); i++)
-    {
+    std::map<int, std::vector<std::pair<int, Eigen::Matrix<double, 11, 1>>>> featureFrame;
+    for (size_t i = 0; i < ids.size(); i++) {
       if(!std::isinf(cur_un_pts[i].x) && !std::isinf(cur_un_pts[i].y) &&
           !std::isnan(cur_un_pts[i].x) && !std::isnan(cur_un_pts[i].y))
       {
@@ -330,8 +331,6 @@ namespace vins_mah
       }
     }
 
-    //LOG(INFO) << "matched num : %d", ids.size();
-
     if (!_img1.empty() && use_stereo_)
     {
       for (size_t i = 0; i < ids_right.size(); i++)
@@ -365,7 +364,7 @@ namespace vins_mah
           // modified by myself
           xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y, x_11, x_12, x_21, x_22;
           featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
-        }    
+        }   
       }
     }
 
@@ -394,7 +393,6 @@ namespace vins_mah
 
       std::vector<uchar> status;
       cv::findFundamentalMat(un_cur_pts, un_prev_pts, cv::FM_RANSAC, ransac_reproj_threshold_, 0.99, status);
-      int size_a = cur_pts.size();
       reduceVector(prev_pts, status);
       reduceVector(cur_pts, status);
       reduceVector(cur_un_pts, status);
@@ -602,7 +600,7 @@ namespace vins_mah
     return H;
   }
 
-  void FeatureTracker::getCovariance(const cv::Mat& cur_img, const cv::Mat& prev_img, const cv::Point2f& center, const int id, const int feature_index, const double err, const bool right) {
+  void FeatureTracker::getCovariance(const cv::Mat& cur_img, const cv::Mat& prev_img, const cv::Point2f& center, const int id, const int feature_index, const bool right) {
     // if the feature only is tracked once and isn't in the right image, then stop.
     if (track_cnt[feature_index] < 2 && !right)
       return;

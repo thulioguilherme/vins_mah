@@ -20,6 +20,8 @@
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
 
+#include <std_msgs/msg/float64.hpp>
+
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 
@@ -216,7 +218,7 @@ public:
   Eigen::Vector3d last_path_;
   double total_solver_time_ms_{0.0};
   int num_solver_runs_{0};
-  
+
   // Publishers
   void publishTrackImages(const cv::Mat &track_img, const rclcpp::Time &timestamp);
   image_transport::Publisher it_publisher_track_;
@@ -237,7 +239,7 @@ public:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr publisher_camera_visual_poses_;
   std::unique_ptr<vins_mah::utils::CameraPoseVisualization> camera_pose_visualizer_;
 
-  int debug_level_{2};
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr publisher_num_features_;
 
   // added by myself
   std::vector<Eigen::Matrix<double, StateSize::POSE - 1, StateSize::POSE - 1>> pose_covs_;

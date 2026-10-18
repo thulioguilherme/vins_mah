@@ -28,14 +28,14 @@ void EstimatorNode::initialize() {
   RCLCPP_INFO(get_logger(), "Initializing node!");
 
   // Get node namespace
-  node_->declare_parameter<std::string>("uav_name", "uav1");
-  node_->get_parameter("uav_name", _uav_name_);
+  node_->declare_parameter<std::string>("node_namespace", "uav1");
+  node_->get_parameter("node_namespace", _node_namespace_);
 
   vio_options_manager_ = std::make_shared<vins_mah::VioOptionsManager>(shared_from_this());
   vio_options_ = vio_options_manager_->getOptions();
 
   auto tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
-  estimator_ = std::make_shared<Estimator>(shared_from_this(), _uav_name_, vio_options_);
+  estimator_ = std::make_shared<Estimator>(shared_from_this(), _node_namespace_, vio_options_);
   estimator_->setParameters();
 
   rclcpp::QoS qos = vio_options_.use_reliable_qos ? rclcpp::QoS(1000).reliable() : rclcpp::SensorDataQoS();
@@ -65,7 +65,7 @@ void EstimatorNode::initialize() {
 
   sync_thread_ = std::thread(&EstimatorNode::syncronizeProcess, this);
 
-  RCLCPP_INFO(get_logger(), "Node initialized!");
+  RCLCPP_INFO(this->get_logger(), "Node initialized!");
   is_initialized_ = true;
 }
 
@@ -125,25 +125,14 @@ void EstimatorNode::callbackImu(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 /* extractImageFromROSMsg() //{ */
 
 cv::Mat EstimatorNode::extractImageFromROSMsg(const sensor_msgs::msg::Image::ConstSharedPtr msg) {
-  cv_bridge::CvImageConstPtr ptr;
-
   if (msg->encoding == "8UC1") {
-    sensor_msgs::msg::Image img;
+    cv::Mat img(msg->height, msg->width, CV_8UC1, const_cast<uint8_t*>(msg->data.data()), msg->step);
 
-    img.header = msg->header;
-    img.height = msg->height;
-    img.width = msg->width;
-    img.is_bigendian = msg->is_bigendian;
-    img.step = msg->step;
-    img.data = msg->data;
-    img.encoding = "mono8";
-
-    ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+    return img.clone();
   } else {
-    ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+    cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+    return ptr->image;
   }
-
-  return ptr->image.clone();
 }
 
 //}
@@ -164,15 +153,17 @@ void EstimatorNode::syncronizeProcess() {
           double time0 = rclcpp::Time(img0_buf_.front()->header.stamp).seconds();
           double time1 = rclcpp::Time(img1_buf_.front()->header.stamp).seconds();
 
-          // 0.003s sync tolerance
-          if (time0 < time1 - 0.003) {
+          // Sync tolerance
+          if (time0 < (time1 - vio_options_.image_sync_timestamp_tolerance)) {
             img0_buf_.pop();
-            RCLCPP_WARN(this->get_logger(), "Throwing img0");
-          } else if (time0 > time1 + 0.003) {
+            double delta = time1 - time0;
+            RCLCPP_WARN(this->get_logger(), "Throwing img0 (delta: %.5f)", delta);
+          } else if (time0 > (time1 + vio_options_.image_sync_timestamp_tolerance)) {
             img1_buf_.pop();
-            RCLCPP_WARN(this->get_logger(), "Throwing img1");
+            double delta = time0 - time1;
+            RCLCPP_WARN(this->get_logger(), "Throwing img1 (delta: %.5f)", delta);
           } else {
-            time = rclcpp::Time(img0_buf_.front()->header.stamp).seconds();
+            time = time0;
 
             header = img0_buf_.front()->header;
 

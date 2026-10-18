@@ -15,7 +15,7 @@ import yaml
 
 
 def launch_setup(context: launch.LaunchContext, ld):
-    namespace = 'vm_estimator'
+    container_namespace = 'vm_estimator'
     executable_name = 'vm_estimator'
 
     # #{ uav_name
@@ -100,8 +100,9 @@ def launch_setup(context: launch.LaunchContext, ld):
         name=executable_name,
 
         parameters=[
-            {'uav_name': uav_name},
+            {'node_namespace': uav_name},
             {'use_sim_time': use_sim_time},
+            {'config_folder': config_folder},
             ParameterFile(
                 PathJoinSubstitution([
                     FindPackageShare('vins_mah'),
@@ -137,13 +138,13 @@ def launch_setup(context: launch.LaunchContext, ld):
 
     standalone_container = ComposableNodeContainer(
         namespace=uav_name,
-        name=namespace+'_container',
+        name=container_namespace+'_container',
         package='rclcpp_components',
         executable='component_container_mt',
         output='screen',
         arguments=['--ros-args', '--log-level', log_level],
         composable_node_descriptions=[estimator_node],
-        condition=IfCondition(standalone)
+        condition=IfCondition(standalone),
     )
 
     ld.add_action(standalone_container)

@@ -39,7 +39,10 @@ Estimator::Estimator(const rclcpp::Node::SharedPtr &node, const std::string node
 
   para_pose_.resize(vio_options_.window_size + 1);
   para_speed_bias_.resize(vio_options_.window_size + 1);
-  para_feature_.resize(vio_options_.num_pts);
+
+  // Magic number from the original implementation
+  // It is suppose to be bigger than NUM_PTS parameter
+  para_feature_.resize(1000);
 
   last_path_ = Eigen::Vector3d(0, 0, 0);
 
@@ -53,6 +56,7 @@ Estimator::Estimator(const rclcpp::Node::SharedPtr &node, const std::string node
   publisher_odometry_ = node_->create_publisher<nav_msgs::msg::Odometry>("~/odom", 1);
   publisher_path_ = node_->create_publisher<nav_msgs::msg::Path>("~/path", 1);
   publisher_key_poses_ = node_->create_publisher<visualization_msgs::msg::Marker>("~/key_poses", 1);
+  publisher_num_features_ = node_->create_publisher<std_msgs::msg::Float64>("~/num_points", 1);
   publisher_feature_landmarks_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("~/feature_landmarks", 1);
   publisher_marginalized_landmarks_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("~/marginalized_landmarks", 1);
   publisher_camera_visual_poses_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("~/camera_visual_poses", 1);
@@ -377,10 +381,29 @@ void Estimator::processMeasurements() {
 
       processImage(feature.second, feature.first);
       prevTime = curTime;
-      
+
       double processing_time_ms = timer.toc();
       if (vio_options_.increase_verbosity) {
         printStatistics(processing_time_ms);
+      }
+
+      // Print camera extrinsics if we are calibrating it
+      if (state_ == EstimatorState::OPTIMIZATION) {
+        if (vio_options_.calib_cam_extrinsics_mode != ExtrinsicEstimationMode::FIXED) {
+          for (int i = 0; i < vio_options_.num_cameras; ++i) {
+            std::ostringstream ss;
+            ss << "Online extrinsic calibration (Cam" << i << "): \n"
+               << "  translation (tic): " << tic[i].transpose() << "\n"
+               << "  rotation YPR (deg): " << vins_mah::utils::Rotations::R2ypr(ric[i]).transpose();
+
+            RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 3000, "%s", ss.str().c_str());
+          }
+        }
+
+        if (vio_options_.calib_cam_time_offset) {
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 3000,
+            "Estimated camera-IMU time offset (td): %.6f s", vio_options_.cam_time_offset);
+        }
       }
 
       rclcpp::Time timestamp = rclcpp::Time(static_cast<int64_t>(feature.first * 1e9));
@@ -467,10 +490,9 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     marginalization_strategy_ = MarginalizationStrategy::REMOVE_SECOND_NEWEST;
   }
 
-  if (vio_options_.increase_verbosity) {
-    RCLCPP_INFO(node_->get_logger(), "Solving %d frames", frame_count);
-    RCLCPP_INFO(node_->get_logger(), "Number of features: %d", feature_manager_.getFeatureCount());
-  }
+  std_msgs::msg::Float64 num_features;
+  num_features.data = feature_manager_.getFeatureCount();
+  publisher_num_features_->publish(num_features);
 
   headers_[frame_count] = header;
 
@@ -479,7 +501,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
   all_image_frame.insert(std::make_pair(header, std::move(imageframe)));
   tmp_pre_integration = std::make_unique<vins_mah::factor::IntegrationBase>(acc_0, gyr_0, bas_[frame_count], bgs_[frame_count], vio_options_.imu);
 
-  if (vio_options_.calib_cam_extrinsics_mode == ExtrinsicEstimationMode::CALIBRATE) {
+  if (vio_options_.calib_cam_extrinsics_mode != ExtrinsicEstimationMode::FIXED) {
     RCLCPP_INFO(node_->get_logger(), "Calibrating extrinsic parameters, rotation movement is needed!");
     if (frame_count != 0) {
       std::vector<std::pair<Vector3d, Vector3d>> corres = feature_manager_.getCorresponding(frame_count - 1, frame_count);
@@ -638,8 +660,8 @@ bool Estimator::initialStructure() {
 
     var = sqrt(var / ((int)all_image_frame.size() - 1));
     if (var < 0.25) {
-      RCLCPP_WARN(node_->get_logger(), "Not enough IMU excitation (imu variation: %lf)", var);
-      // return false; ???
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 3000, "Not enough IMU excitation (imu variation: %lf)", var);
+      // return false;
     }
   }
 
@@ -665,7 +687,7 @@ bool Estimator::initialStructure() {
   Eigen::Vector3d relative_T;
   int l;
   if (!relativePose(relative_R, relative_T, l)) {
-    RCLCPP_INFO(node_->get_logger(), "Not enough features or parallax. Move device around!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 3000, "Not enough features or parallax. Move device around!");
     return false;
   }
 
@@ -830,7 +852,7 @@ bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
       }
       average_parallax = 1.0 * sum_parallax / int(corres.size());
       bool ok = m_estimator.solveRelativeRT(corres, relative_R, relative_T);
-      RCLCPP_INFO(node_->get_logger(), "recoverPose=%d", ok);
+      /* RCLCPP_INFO(node_->get_logger(), "recoverPose=%d", ok); */
       if (average_parallax * 460 > 30 && ok) {
         l = i;
         RCLCPP_INFO(node_->get_logger(), "average_parallax %f choose l %d and newest frame to triangulate the whole structure", average_parallax * 460, l);
@@ -1644,46 +1666,43 @@ void Estimator::updateLatestStates() {
 /* outliersRejection() //{ */
 
 // added by myself
-void Estimator::outliersRejection(set<int> &keepIndex, set<int> &removeIndex)
-{
-    double chi_square_test = 5.99;
+void Estimator::outliersRejection(set<int> &keepIndex, set<int> &removeIndex) {
+  for(auto &it_per_id : feature_manager_.feature) {
+    it_per_id.used_num = it_per_id.feature_per_frame.size();
+    if (it_per_id.used_num < 4)
+      continue;
 
-    for(auto &it_per_id : feature_manager_.feature) {
-        it_per_id.used_num = it_per_id.feature_per_frame.size();
-        if (it_per_id.used_num < 4)
-            continue;
+    int imu_i = it_per_id.start_frame;
+    Vector3d pts_i = it_per_id.feature_per_frame[0].point;
+    double depth = it_per_id.estimated_depth;
 
-        int imu_i = it_per_id.start_frame;
-        Vector3d pts_i = it_per_id.feature_per_frame[0].point;
-        double depth = it_per_id.estimated_depth;
+    pair<int, int> bestFrame = computeMaxParallaxFrame(it_per_id, frame_count);
+    int imu_j = bestFrame.first;
+    int camera = bestFrame.second;
 
-        pair<int, int> bestFrame = computeMaxParallaxFrame(it_per_id, frame_count);
-        int imu_j = bestFrame.first;
-        int camera = bestFrame.second;
+    double mah2 = 0.0;
 
-        double mah2 = 0.0;
-
-        if(imu_j != -1) {
-            if(camera == 0) {
-                Vector3d pts_j = it_per_id.feature_per_frame[imu_j - imu_i].point;
-                Eigen::Matrix2d feature_cov = it_per_id.feature_per_frame[imu_j - imu_i].featureCovs[0];                
-                mah2 = computeMahDist(rs_[imu_i], ps_[imu_i], ric[0], tic[0], 
-                                    rs_[imu_j], ps_[imu_j], ric[0], tic[0],
-                                    depth, pts_i, pts_j, feature_cov, imu_i, imu_j);
-            } else {
-                Vector3d pts_j = it_per_id.feature_per_frame[imu_j - imu_i].pointRight;
-                Eigen::Matrix2d feature_cov = it_per_id.feature_per_frame[imu_j - imu_i].featureCovs[1];
-                mah2 = computeMahDist(rs_[imu_i], ps_[imu_i], ric[0], tic[0], 
-                                    rs_[imu_j], ps_[imu_j], ric[1], tic[1],
-                                    depth, pts_i, pts_j, feature_cov, imu_i, imu_j);
-            }
-        }
-        if (mah2 > chi_square_test) {
-          removeIndex.insert(it_per_id.feature_id);
-        } else {
-          keepIndex.insert(it_per_id.feature_id);
-        }
+    if(imu_j != -1) {
+      if(camera == 0) {
+        Vector3d pts_j = it_per_id.feature_per_frame[imu_j - imu_i].point;
+        Eigen::Matrix2d feature_cov = it_per_id.feature_per_frame[imu_j - imu_i].featureCovs[0];                
+        mah2 = computeMahDist(rs_[imu_i], ps_[imu_i], ric[0], tic[0], 
+            rs_[imu_j], ps_[imu_j], ric[0], tic[0],
+            depth, pts_i, pts_j, feature_cov, imu_i, imu_j);
+      } else {
+        Vector3d pts_j = it_per_id.feature_per_frame[imu_j - imu_i].pointRight;
+        Eigen::Matrix2d feature_cov = it_per_id.feature_per_frame[imu_j - imu_i].featureCovs[1];
+        mah2 = computeMahDist(rs_[imu_i], ps_[imu_i], ric[0], tic[0], 
+            rs_[imu_j], ps_[imu_j], ric[1], tic[1],
+            depth, pts_i, pts_j, feature_cov, imu_i, imu_j);
+      }
     }
+    if (mah2 > vio_options_.outlier_chi_square_threshold) {
+      removeIndex.insert(it_per_id.feature_id);
+    } else {
+      keepIndex.insert(it_per_id.feature_id);
+    }
+  }
 }
 
 //}
@@ -2103,20 +2122,6 @@ void Estimator::printStatistics(const double solver_time_ms) {
   if (state_ != EstimatorState::OPTIMIZATION)
     return;
 
-  // Print camera extrinsics if we are calibrating it
-  if (vio_options_.calib_cam_extrinsics_mode == ExtrinsicEstimationMode::CALIBRATE) {
-    for (int i = 0; i < vio_options_.num_cameras; ++i) {
-      RCLCPP_INFO(node_->get_logger(), "Cam%d", i);
-
-      std::ostringstream ss;
-      ss << "  Translation: " << tic[i].transpose();
-      RCLCPP_INFO(node_->get_logger(), "%s", ss.str().c_str());
-
-      ss << "  Rotation: " << vins_mah::utils::Rotations::R2ypr(ric[i]).transpose();
-      RCLCPP_INFO(node_->get_logger(), "%s", ss.str().c_str());
-    }
-  }
-
   total_solver_time_ms_ += solver_time_ms;
   ++num_solver_runs_;
 
@@ -2127,9 +2132,6 @@ void Estimator::printStatistics(const double solver_time_ms) {
 
   RCLCPP_INFO(node_->get_logger(), "Accumulated path: %.3f m", total_path_length_);
 
-  if (vio_options_.calib_cam_time_offset) {
-    RCLCPP_INFO(node_->get_logger(), "Estimated camera-IMU time offset: %.6f s", vio_options_.cam_time_offset);
-  }
 }
 
 //}

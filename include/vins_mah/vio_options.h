@@ -43,8 +43,11 @@ struct VioOptions {
   std::string cfg_imucam_file;
   std::string cfg_imu_file;
 
-  // ?
+  // Uncertainty estimator parameters
   int window_size;
+  double outlier_chi_square_threshold;
+  double image_sync_timestamp_tolerance;
+
   double init_depth;
   double min_parallax;
   int num_cameras{1};
