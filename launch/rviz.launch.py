@@ -1,7 +1,7 @@
 import launch
 
-from launch.actions import ExecuteProcess
-from launch.substitutions import PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -9,6 +9,8 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     ld = launch.LaunchDescription()
+
+    ld.add_action(DeclareLaunchArgument('use_sim_time', default_value='false'))
 
     # #{ refactor Rviz script
 
@@ -34,6 +36,7 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         output='screen',
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
         arguments=['-d /tmp/default.rviz'],
         prefix=["bash -c 'sleep 2; $0 $@'"])
 

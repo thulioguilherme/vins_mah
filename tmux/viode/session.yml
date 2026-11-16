@@ -1,22 +1,25 @@
 root: ./
 name: estimator
 startup_window: vins_mah
-pre_window: export UAV_NAME=uav33; export SCENE_NAME=parking_lot; export DYNAMIC_LEVEL="0_none"; export BAG_PATH="$HOME/refactored_bags/$SCENE_NAME/$DYNAMIC_LEVEL"
+pre_window: export UAV_NAME=uav33; export CONFIG_FOLDER=viode; export SCENE_NAME=city_night; export DYNAMIC_LEVEL="0_none"; export BAG_PATH="$HOME/rosbags/viode/$SCENE_NAME/$DYNAMIC_LEVEL"
 windows:
+  - router:
+      panes:
+        - ros2 run rmw_zenoh_cpp rmw_zenohd
   - bag:
       layout: tiled
       panes:
-        - sleep 2; ros2 bag play $BAG_PATH
+        - sleep 2; ros2 bag play "$BAG_PATH" --clock
   - vins_mah:
       layout: tiled
       panes:
-        - ros2 launch vins_mah estimator_node.launch.py
+        - ros2 launch vins_mah estimator_node.launch.py config_folder:=$CONFIG_FOLDER
   - helpers:
       layout: tiled
       panes:
-        - ros2 launch trajectory_tools groundtruth_alignment.launch.py topic_odom:=/vm_estimator/odom topic_gt:=/groundtruth/odom
-        - ros2 launch trajectory_tools publish_odometry_as_path.launch.py topic_odom:=/groundtruth/odom
-        # - ros2 run trajectory_tools image_rate_monitor
+        - ros2 launch trajectory_tools groundtruth_alignment.launch.py topic_odom:=/vm_estimator/odom topic_gt:=/groundtruth/odom use_sim_time:=true
+        - ros2 launch trajectory_tools publish_odometry_as_path.launch.py topic_odom:=/groundtruth/odom use_sim_time:=true
+        - ros2 run trajectory_tools image_rate_monitor --ros-args -r "~/image_in:=/$UAV_NAME/cam0/image_raw" -p use_sim_time:=true
   - rviz:
       layout: tiled
       panes:
@@ -24,4 +27,4 @@ windows:
   - record_trajectory:
       layout: tiled
       panes:
-        - ros2 launch ov_eval record_viode_trajectories.launch.py scene_name:=$SCENE_NAME dynamic_level:=$DYNAMIC_LEVEL
+        - ros2 launch ov_eval record_viode_trajectories.launch.py scene_name:=$SCENE_NAME dynamic_level:=$DYNAMIC_LEVEL config_folder:=$CONFIG_FOLDER use_sim_time:=true

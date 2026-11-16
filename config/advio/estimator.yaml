@@ -37,7 +37,7 @@
     min_parallax: 10.0 # [pixel] keyframe selection threshold
 
     # Optimization parameters
-    solver_max_time: 0.04  # [ms] max solver iteration time (to guarantee real time)
+    solver_max_time: 0.04  # Ceres solver budget [s]; not an end-to-end deadline
     solver_max_num_iterations: 8  # max solver itrations (to guarantee real time)
 
     # Calibration parameters

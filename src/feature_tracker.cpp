@@ -310,10 +310,10 @@ namespace vins_mah
         velocity_y = pts_velocity[i].y;
 
         // added by myself
-        double x_11 = un_posCovs[feature_id][0](0, 0);
-        double x_12 = un_posCovs[feature_id][0](0, 1);
-        double x_21 = un_posCovs[feature_id][0](1, 0);
-        double x_22 = un_posCovs[feature_id][0](1, 1);
+        Eigen::Matrix2d covariance = Eigen::Matrix2d::Zero();
+        const auto cov = un_posCovs.find(feature_id);
+        if (cov != un_posCovs.end())
+          covariance = cov->second[0];
         // LOG(INFO) << "left id: %d; track count: %d,", feature_id, track_cnt[i];
 
         /* std::cout << "cur_un_pts: " */
@@ -326,7 +326,8 @@ namespace vins_mah
 
         Eigen::Matrix<double, 11, 1> xyz_uv_velocity;
         // modified by myself
-        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y, x_11, x_12, x_21, x_22;
+        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y,
+            covariance(0, 0), covariance(0, 1), covariance(1, 0), covariance(1, 1);
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
       }
     }
@@ -352,17 +353,18 @@ namespace vins_mah
           velocity_y = right_pts_velocity[i].y;
 
           // added by myself
-          double x_11 = un_posCovs[feature_id][1](0, 0);
-          double x_12 = un_posCovs[feature_id][1](0, 1);
-          double x_21 = un_posCovs[feature_id][1](1, 0);
-          double x_22 = un_posCovs[feature_id][1](1, 1);
+          Eigen::Matrix2d covariance = Eigen::Matrix2d::Zero();
+          const auto cov = un_posCovs.find(feature_id);
+          if (cov != un_posCovs.end())
+            covariance = cov->second[1];
 
           // LOG(INFO) << "right id: %d; track count: %d,", feature_id, track_cnt[i];
 
           Eigen::Matrix<double, 11, 1> xyz_uv_velocity;
 
           // modified by myself
-          xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y, x_11, x_12, x_21, x_22;
+          xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y,
+              covariance(0, 0), covariance(0, 1), covariance(1, 0), covariance(1, 1);
           featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
         }   
       }
@@ -438,6 +440,8 @@ namespace vins_mah
 
   std::vector<cv::Point2f> FeatureTracker::undistortedPts(std::vector<cv::Point2f> &pts, const std::shared_ptr<vins_mah::camera_model::PinholeCamera> &cam) {
     std::vector<cv::Point2f> undistorted_pts;
+    if (pts.empty())
+      return undistorted_pts;
     cv::undistortPoints(pts, undistorted_pts, cam->K, cam->D);
 
     return undistorted_pts;
@@ -633,7 +637,10 @@ namespace vins_mah
     // Eigen::Matrix2d Cov = (var + flowVar) * Hinv;
     Eigen::Matrix2d Cov = var * Hinv;
     // update the covariance
-    posCovs[id][right ? 1 : 0] += Cov;
+    // Each camera's covariance is computed once per frame; Eigen defaults are uninitialized.
+    auto cov = posCovs.try_emplace(id,
+        std::array<Eigen::Matrix2d, 2>{Eigen::Matrix2d::Zero(), Eigen::Matrix2d::Zero()}).first;
+    cov->second[right ? 1 : 0] = Cov;
     // update the flow variance
     if(!right)
       flowVars[id] = var + flowVar;
@@ -662,7 +669,9 @@ namespace vins_mah
 
     auto it = posCovs.find(feature_id);
     if (it != posCovs.end()) {
-      un_posCovs[feature_id][right ? 1 : 0] = Kinv * it->second[right ? 1 : 0] * Kinv;
+      auto cov = un_posCovs.try_emplace(feature_id,
+          std::array<Eigen::Matrix2d, 2>{Eigen::Matrix2d::Zero(), Eigen::Matrix2d::Zero()}).first;
+      cov->second[right ? 1 : 0] = Kinv * it->second[right ? 1 : 0] * Kinv;
     }
   }
 

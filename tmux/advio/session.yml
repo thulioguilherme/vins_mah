@@ -16,7 +16,7 @@ windows:
       panes:
         - ros2 launch trajectory_tools groundtruth_alignment.launch.py topic_odom:=/vm_estimator/odom topic_gt:=/groundtruth/odom
         - ros2 launch trajectory_tools publish_odometry_as_path.launch.py topic_odom:=/groundtruth/odom
-        - ros2 run trajectory_tools image_rate_monitor
+        - ros2 run trajectory_tools image_rate_monitor --ros-args -r "~/image_in:=/$UAV_NAME/cam0/image_raw"
   - rviz:
       layout: tiled
       panes:
